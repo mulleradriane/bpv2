@@ -32,3 +32,18 @@ output "methods_hash" {
   description = "Hash atual dos métodos (para debug)"
   value       = local.methods_hash
 }
+
+output "api_policy" {
+  description = "Policy JSON aplicada ao API Gateway"
+  value       = module.api_policy.policy
+}
+
+output "ci_role_arn" {
+  description = "ARN da role IAM para CI/CD"
+  value       = module.iam_service.role_arn
+}
+
+output "user_group_name" {
+  description = "Nome do grupo IAM para usuários humanos (se habilitado)"
+  value       = var.enable_human_iam ? module.user_group[0].name : null
+}
