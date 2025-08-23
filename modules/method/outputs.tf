@@ -12,40 +12,31 @@ output "method_ids" {
 # Method Configuration para Deployment Hash (CRÍTICO)
 ##############################
 output "method_configs" {
-  description = "Configurações dos métodos para cálculo de hash de deployment"
-  value = {
-    for method_name, method_config in var.methods : method_name => {
-      integration_type        = method_config.integration_type
-      uri                     = try(method_config.uri, "")
-      integration_http_method = try(method_config.integration_http_method, "")
-      request_parameters      = try(method_config.request_parameters, {})
-      request_templates       = try(method_config.request_templates, {})
-      request_models          = try(method_config.request_models, {})
-      enable_cors            = try(method_config.enable_cors, false)
-      proxy                  = try(method_config.proxy, false)
-      timeout                = try(method_config.timeout, 29000)
-      connection_type        = try(method_config.connection_type, "")
-      connection_id          = try(method_config.connection_id, "")
-    }
-  }
+  description = "Configurações dos métodos criados"
+  value       = { for method_name, config in aws_api_gateway_integration.this : method_name => {
+    integration_type    = config.type
+    uri                 = config.uri
+    request_templates   = config.request_templates
+    request_parameters  = config.request_parameters
+  } }
 }
 
-##############################
-# ARNs dos Recursos
-##############################
-output "method_arns" {
-  description = "ARNs dos métodos criados"
-  value = {
-    for method_name in keys(var.methods) : method_name => aws_api_gateway_method.this[method_name].arn
-  }
-}
+# ##############################
+# # ARNs dos Recursos
+# ##############################
+# output "method_arns" {
+#   description = "ARNs dos métodos criados"
+#   value = {
+#     for method_name in keys(var.methods) : method_name => aws_api_gateway_method.this[method_name].arn
+#   }
+# }
 
-output "integration_arns" {
-  description = "ARNs das integrações criadas"
-  value = {
-    for method_name in keys(var.methods) : method_name => aws_api_gateway_integration.this[method_name].arn
-  }
-}
+# output "integration_arns" {
+#   description = "ARNs das integrações criadas"
+#   value = {
+#     for method_name in keys(var.methods) : method_name => aws_api_gateway_integration.this[method_name].arn
+#   }
+# }
 
 ##############################
 # Detalhes dos Métodos

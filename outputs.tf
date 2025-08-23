@@ -1,3 +1,4 @@
+# outputs.tf
 output "api_id" {
   description = "ID da API Gateway REST"
   value       = module.api.id
@@ -8,24 +9,24 @@ output "api_root_resource_id" {
   value       = module.api.root_resource_id
 }
 
-output "deployment_id" {
-  description = "ID do deployment atual"
-  value       = module.deployment.deployment_id
+output "deployment_ids" {
+  description = "Map of deployment IDs for each stage"
+  value       = { for k, v in module.deployment : k => v.deployment_id }
 }
 
-output "stage_name" {
-  description = "Nome do stage"
-  value       = module.deployment.stage_name
+output "stage_names" {
+  description = "Map of stage names for each stage"
+  value       = { for k, v in module.deployment : k => v.stage_name }
 }
 
-output "invoke_url" {
-  description = "URL de invocação da API"
-  value       = module.deployment.invoke_url
+output "invoke_urls" {
+  description = "Map of invoke URLs for each stage"
+  value       = { for k, v in module.deployment : k => v.invoke_url }
 }
 
-output "stage_arn" {
-  description = "ARN do stage"
-  value       = module.deployment.stage_arn
+output "stage_arns" {
+  description = "Map of stage ARNs for each stage"
+  value       = { for k, v in module.deployment : k => v.stage_arn }
 }
 
 output "methods_hash" {

@@ -65,10 +65,10 @@ output "domain_name" {
   description = "Nome do domínio customizado"
 }
 
-output "domain_cloudfront_distribution_id" {
-  value       = var.domain_name != null ? aws_api_gateway_domain_name.this[0].cloudfront_distribution_id : null
-  description = "ID da distribuição CloudFront do domínio"
-}
+# output "domain_cloudfront_distribution_id" {
+#   value       = var.domain_name != null ? aws_api_gateway_domain_name.this[0].cloudfront_distribution_id : null
+#   description = "ID da distribuição CloudFront do domínio"
+# }
 
 output "domain_cloudfront_domain_name" {
   value       = var.domain_name != null ? aws_api_gateway_domain_name.this[0].cloudfront_domain_name : null

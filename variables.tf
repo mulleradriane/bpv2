@@ -42,7 +42,7 @@ variable "legacy_name" {
 variable "default_allowed_ips" {
   description = "Lista de IPs liberados por default para o API Gateway"
   type        = list(string)
-  default     = ["192.0.2.0/24", "198.51.100.0/24"]  # Ajuste para IPs das apigw
+  default     = ["192.0.2.0/24", "198.51.100.0/24"]
 }
 
 variable "custom_api_policy" {
@@ -85,4 +85,31 @@ variable "tags" {
   description = "Tags corporativas (geradas por módulo externo no futuro)"
   type        = map(string)
   default     = {}
+}
+
+# Novas variáveis para certificados e domínios
+variable "default_certificates" {
+  description = "Mapeamento de ARNs de certificados por ambiente"
+  type        = map(string)
+  default = {
+    dev = "arn:aws:acm:us-east-1:123456789012:certificate/abc123-xyz789" #AJUSTAR CERTIFICADOS!!!
+    hml = "arn:aws:acm:us-east-1:123456789012:certificate/def456-uvw012"
+    prd = "arn:aws:acm:us-east-1:123456789012:certificate/ghi789-jkl345"
+  }
+}
+
+variable "default_domain" {
+  description = "Mapeamento de domínios por ambiente"
+  type        = map(string)
+  default = {
+    dev = "api.dev.example.com"
+    hml = "api.hml.example.com"
+    prd = "api.prd.example.com"
+  }
+}
+
+variable "base_path" {
+  description = "Caminho base opcional para o mapeamento (ex.: v1)"
+  type        = string
+  default     = ""
 }

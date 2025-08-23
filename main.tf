@@ -14,10 +14,13 @@ locals {
   policy_vars = {
     rest_api_id = module.api.id
     account_id  = data.aws_caller_identity.current.account_id
-    region      = data.aws_region.current.name
+    region      = data.aws_region.current.id
     allowed_ips = var.default_allowed_ips
     deny_rules  = var.deny_rules
   }
+
+  # Ambientes suportados
+  environments = toset(["dev", "hml", "prd"])
 
   # Statement base com IPs permitidos para API Policy
   base_statement = [
@@ -94,6 +97,21 @@ locals {
       }
     ]
   })
+
+  # Policy para usuários humanos (legacy)
+  user_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["apigateway:*"]
+        Resource = [
+          "arn:aws:apigateway:${local.policy_vars.region}::/restapis/${local.policy_vars.rest_api_id}",
+          "arn:aws:apigateway:${local.policy_vars.region}::/restapis/${local.policy_vars.rest_api_id}/*"
+        ]
+      }
+    ]
+  })
 }
 
 # Validação temporária para depuração
@@ -113,8 +131,7 @@ module "api" {
   source      = "./modules/api"
   name        = local.name
   description = format("Public API for %s", local.product)
-  stage_name  = var.environment
-  # tags        = var.tags
+  #tags        = var.tags
 }
 
 ##############################
@@ -127,26 +144,37 @@ module "api_policy" {
   depends_on  = [module.api]
 }
 
-# ##############################
-# # IAM para GitLab CI/CD
-# ##############################
-# module "iam_service" {
-#   source = "./modules/iam_service"
+##############################
+# IAM para GitLab CI/CD
+##############################
+module "iam_service" {
+  source = "./modules/iam_service"
+  name        = "${local.name}-ci-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/gitlab" }
+    }]
+  })
+  policy_json = local.ci_policy
+  tags        = var.tags
+}
 
-#   name        = "${local.name}-ci-role"
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [{
-#       Action    = "sts:AssumeRole"
-#       Effect    = "Allow"
-#       Principal = { Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/gitlab" }
-#     }]
-#   })
-#   policy_json = local.ci_policy  # Atualizado para usar local.ci_policy
-#   tags        = var.tags
-# }
-
-
+##############################
+# Certificados e Domínios por Ambiente
+##############################
+module "certificate" {
+  source            = "./modules/certificate"
+  for_each          = local.environments
+  domain_name       = lookup(var.default_domain, each.key, "${each.key}.api.example.com")
+  certificate_arn   = lookup(var.default_certificates, each.key, null)
+  rest_api_id       = module.api.id
+  stage_name        = each.key
+  base_path         = var.base_path
+  depends_on        = [module.api]
+}
 
 ##############################
 # IAM para Usuários Humanos (Legacy, Opcional)
@@ -154,7 +182,6 @@ module "api_policy" {
 module "user_group" {
   source = "./modules/user_group"
   count  = var.enable_human_iam ? 1 : 0
-
   role        = "Apigw"
   team        = local.product
   legacy_name = var.legacy_user_group_name
@@ -165,7 +192,6 @@ module "user_group" {
 module "iam_user_policy" {
   source = "./modules/iam_user_policy"
   count  = var.enable_human_iam ? 1 : 0
-
   environment = local.environment
   team        = local.product
   product     = local.product
@@ -174,7 +200,7 @@ module "iam_user_policy" {
   blueprint   = var.blueprint
   custom_tags = var.custom_tags
   legacy_name = var.legacy_policy_name
-  policy      = templatefile("${path.module}/files/user-policy.json", local.policy_vars)
+  policy      = local.user_policy
   groups_to_attachment = [module.user_group[0].name]
   depends_on  = [module.user_group]
 }
@@ -306,39 +332,71 @@ EOF
 # Locals para cálculo do hash de deployment
 ##############################
 locals {
+  # Primeiro, criamos as strings de configuração para cada método
+  hello_method_strings = [
+    for method_name, config in module.hello_methods.method_configs : format(
+      "%s:%s:%s:%s:%s",
+      method_name,
+      coalesce(config.integration_type, "none"),
+      coalesce(config.uri, "none"),
+      config.request_templates != null ? jsonencode(config.request_templates) : "{}",
+      config.request_parameters != null ? jsonencode(config.request_parameters) : "{}"
+    )
+  ]
+  
+  item_method_strings = [
+    for method_name, config in module.item_methods.method_configs : format(
+      "%s:%s:%s:%s:%s",
+      method_name,
+      coalesce(config.integration_type, "none"),
+      coalesce(config.uri, "none"),
+      config.request_templates != null ? jsonencode(config.request_templates) : "{}",
+      config.request_parameters != null ? jsonencode(config.request_parameters) : "{}"
+    )
+  ]
+  
+  # Concatenamos e ordenamos as strings
   all_method_configs = sort(concat(
-    [
-      for method_name, config in module.hello_methods.method_configs : "${method_name}:${config.integration_type}:${try(config.uri, "")}:${try(jsonencode(config.request_templates), "")}:${try(jsonencode(config.request_parameters), "")}"
-    ],
-    [
-      for method_name, config in module.item_methods.method_configs : "${method_name}:${config.integration_type}:${try(config.uri, "")}:${try(jsonencode(config.request_templates), "")}:${try(jsonencode(config.request_parameters), "")}"
-    ]
+    local.hello_method_strings,
+    local.item_method_strings
   ))
+  
   all_configs = {
-    methods    = local.all_method_configs
+    methods = local.all_method_configs
     validators = concat(
       values(module.hello_methods.request_validators),
       values(module.item_methods.request_validators)
     )
-    stage_variables = module.deployment.stage_variables
+    stage_variables = {
+      environment = var.environment
+      version     = "v2"
+    }
   }
+  
   methods_hash = sha256(jsonencode(local.all_configs))
 }
 
 ##############################
-# Deployment Automático
+# CloudWatch Log Group para logs de acesso da API Gateway
+##############################
+resource "aws_cloudwatch_log_group" "api_gateway_logs" {
+  name              = "/aws/apigateway/${module.api.id}"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+##############################
+# Deployment por Ambiente
 ##############################
 module "deployment" {
   source                 = "./modules/deployment"
+  for_each               = local.environments
   rest_api_id            = module.api.id
-  stage_name             = var.environment
+  stage_name             = each.key
   triggers_sha           = local.methods_hash
-  deployment_description = "Atualização automática da API com métodos e validações"
-  stage_variables        = { environment = var.environment, version = "v2", lambda_alias = var.environment }
-  throttle_settings      = { rate_limit = 1000, burst_limit = 2000 }
-  cache_cluster_enabled   = false
-  cache_cluster_size     = "0.5"
+  deployment_description = "Deployment para ${each.key}"
+  stage_variables        = { environment = each.key, version = "v2" }
   tags                   = var.tags
+  log_group_arn          = aws_cloudwatch_log_group.api_gateway_logs.arn
   depends_on             = [module.hello_methods, module.item_methods]
 }
-
