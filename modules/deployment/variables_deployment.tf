@@ -106,13 +106,12 @@ variable "unauthorized_cache_control_header_strategy" {
 # Logging Settings
 ##############################
 variable "logging_level" {
+  description = "Nível de logging (OFF, ERROR, INFO)"
   type        = string
   default     = null
-  description = "Nível de logging (OFF, ERROR, INFO)"
-  
   validation {
-    condition = var.logging_level == null || contains(["OFF", "ERROR", "INFO"], var.logging_level)
-    error_message = "Logging level deve ser OFF, ERROR ou INFO."
+    condition     = var.logging_level == null || (var.logging_level != null && can(regex("^(OFF|ERROR|INFO)$", var.logging_level)))
+    error_message = "O valor de logging_level deve ser null ou um dos seguintes: OFF, ERROR, INFO."
   }
 }
 
@@ -138,6 +137,12 @@ variable "create_log_role" {
   type        = bool
   default     = true
   description = "Cria role IAM para logs do API Gateway"
+}
+
+variable "log_group_arn" {
+  description = "ARN do CloudWatch Log Group para logs de acesso"
+  type        = string
+  default     = null
 }
 
 ##############################

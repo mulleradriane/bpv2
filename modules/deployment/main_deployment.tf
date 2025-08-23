@@ -21,22 +21,34 @@ resource "aws_api_gateway_deployment" "this" {
 # API Gateway Stage
 ##############################
 resource "aws_api_gateway_stage" "this" {
-  deployment_id = aws_api_gateway_deployment.this.id
-  rest_api_id   = var.rest_api_id
-  stage_name    = var.stage_name
-  
-  # Stage variables
-  variables = var.stage_variables
-  
-  # Descrição do stage
-  description = var.stage_description != null ? var.stage_description : "Stage ${var.stage_name} managed by Terraform"
-  
-  # Cache settings
-  cache_cluster_enabled = var.cache_cluster_enabled
-  cache_cluster_size    = var.cache_cluster_enabled ? var.cache_cluster_size : null
-  
-  # Tags
-  tags = var.tags
+  deployment_id        = aws_api_gateway_deployment.this.id
+  rest_api_id          = var.rest_api_id
+  stage_name           = var.stage_name
+  description          = "Stage ${var.stage_name} managed by Terraform"
+  cache_cluster_enabled = false
+  variables            = var.stage_variables
+  tags                 = var.tags
+  xray_tracing_enabled = true
+
+  access_log_settings {
+    destination_arn = var.log_group_arn != null ? var.log_group_arn : (
+      var.logging_level != null && var.logging_level != "OFF" ? aws_cloudwatch_log_group.api_gateway[0].arn : null
+    )
+    format          = jsonencode({
+      requestId               = "$context.requestId"
+      ip                       = "$context.identity.sourceIp"
+      caller                   = "$context.identity.caller"
+      user                     = "$context.identity.user"
+      requestTime              = "$context.requestTime"
+      httpMethod               = "$context.httpMethod"
+      resourcePath             = "$context.resourcePath"
+      status                   = "$context.status"
+      protocol                 = "$context.protocol"
+      responseLength           = "$context.responseLength"
+    })
+  }
+
+  depends_on = [aws_api_gateway_deployment.this]
 }
 
 ##############################
