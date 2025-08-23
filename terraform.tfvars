@@ -17,3 +17,5 @@ tags = {
   product     = "my-api"
   team        = "devops"
 }
+endpoint_type = "REGIONAL"
+vpc_endpoint_ids = []

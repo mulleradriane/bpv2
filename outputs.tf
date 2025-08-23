@@ -24,11 +24,6 @@ output "invoke_urls" {
   value       = { for k, v in module.deployment : k => v.invoke_url }
 }
 
-output "stage_arns" {
-  description = "Map of stage ARNs for each stage"
-  value       = { for k, v in module.deployment : k => v.stage_arn }
-}
-
 output "methods_hash" {
   description = "Hash atual dos métodos (para debug)"
   value       = local.methods_hash
@@ -47,4 +42,19 @@ output "ci_role_arn" {
 output "user_group_name" {
   description = "Nome do grupo IAM para usuários humanos (se habilitado)"
   value       = var.enable_human_iam ? module.user_group[0].name : null
+}
+
+output "stage_arns" {
+  description = "ARNs das stages do API Gateway por ambiente"
+  value = {
+    for env in local.environments : env => module.deployment[env].stage_arn
+  }
+}
+
+
+output "domain_names" {
+  description = "Nomes de domínio personalizados por ambiente"
+  value = {
+    for env in local.environments : env => module.certificate[env].domain_name
+  }
 }

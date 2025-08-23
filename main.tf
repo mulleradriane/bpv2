@@ -11,6 +11,13 @@ locals {
   environment = lower(trimspace(var.environment))
   product     = lower(trimspace(var.product))
   name        = var.legacy_name != null ? trimspace(var.legacy_name) : format("apigw-%s", local.product)
+  default_tags = {
+    Environment = local.environment
+    Application = var.application
+    Blueprint   = var.blueprint
+    Ticket      = var.ticket != null ? var.ticket : "none"
+  }
+  tags = merge(local.default_tags, var.custom_tags)
   policy_vars = {
     rest_api_id = module.api.id
     account_id  = data.aws_caller_identity.current.account_id
@@ -19,10 +26,8 @@ locals {
     deny_rules  = var.deny_rules
   }
 
-  # Ambientes suportados
   environments = toset(["dev", "hml", "prd"])
 
-  # Statement base com IPs permitidos para API Policy
   base_statement = [
     {
       Effect    = "Allow"
@@ -37,7 +42,6 @@ locals {
     }
   ]
 
-  # Statements de Deny dinâmicos para API Policy
   deny_statements = [
     for k, v in local.policy_vars.deny_rules : {
       Effect    = try(v.Effect, "Deny")
@@ -48,13 +52,11 @@ locals {
     }
   ]
 
-  # Policy completa da API Gateway como JSON
   api_policy = jsonencode({
     Version   = "2012-10-17"
     Statement = concat(local.base_statement, local.deny_statements)
   })
 
-  # Policy para a role CI/CD
   ci_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -98,7 +100,6 @@ locals {
     ]
   })
 
-  # Policy para usuários humanos (legacy)
   user_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -124,19 +125,31 @@ resource "null_resource" "validate_policy_vars" {
   }
 }
 
-##############################
+# # Módulo de Tags Corporativas
+# module "corporate_tags" {
+#   source  = "github.com/example/terraform-aws-tags"
+#   tags    = local.tags
+#   context = {
+#     environment = local.environment
+#     product     = local.product
+#   }
+# }
+
 # API Gateway REST API
-##############################
 module "api" {
   source      = "./modules/api"
   name        = local.name
-  description = format("Public API for %s", local.product)
-  #tags        = var.tags
+  description = format("API pública para %s", local.product)
+  endpoint_type = var.endpoint_type
+  vpc_endpoint_ids = var.endpoint_type == "PRIVATE" ? var.vpc_endpoint_ids : []
+  binary_media_types = var.binary_media_types != null ? var.binary_media_types : ["*/*"]
+  minimum_compression_size = var.minimum_compression_size != null ? var.minimum_compression_size : null
+  api_parameters = var.api_parameters != null ? var.api_parameters : {}
+  openapi_body = var.openapi_body != null ? var.openapi_body : null
+  #tags = local.tags
 }
 
-##############################
 # API Gateway Policy
-##############################
 module "api_policy" {
   source      = "./modules/policy"
   rest_api_id = module.api.id
@@ -144,9 +157,7 @@ module "api_policy" {
   depends_on  = [module.api]
 }
 
-##############################
 # IAM para GitLab CI/CD
-##############################
 module "iam_service" {
   source = "./modules/iam_service"
   name        = "${local.name}-ci-role"
@@ -159,12 +170,10 @@ module "iam_service" {
     }]
   })
   policy_json = local.ci_policy
-  tags        = var.tags
+  tags        = local.tags
 }
 
-##############################
 # Certificados e Domínios por Ambiente
-##############################
 module "certificate" {
   source            = "./modules/certificate"
   for_each          = local.environments
@@ -173,12 +182,11 @@ module "certificate" {
   rest_api_id       = module.api.id
   stage_name        = each.key
   base_path         = var.base_path
+  tags              = local.tags
   depends_on        = [module.api]
 }
 
-##############################
 # IAM para Usuários Humanos (Legacy, Opcional)
-##############################
 module "user_group" {
   source = "./modules/user_group"
   count  = var.enable_human_iam ? 1 : 0
@@ -186,7 +194,7 @@ module "user_group" {
   team        = local.product
   legacy_name = var.legacy_user_group_name
   users_to_attachment = var.users_to_attachment
-  tags        = var.tags
+  tags        = local.tags
 }
 
 module "iam_user_policy" {
@@ -205,9 +213,7 @@ module "iam_user_policy" {
   depends_on  = [module.user_group]
 }
 
-##############################
 # Recurso: /hello
-##############################
 module "hello_resource" {
   source      = "./modules/resource"
   rest_api_id = module.api.id
@@ -215,16 +221,14 @@ module "hello_resource" {
   path_part   = "hello"
 }
 
-##############################
 # Lambda Function: Hello
-##############################
 module "lambda_hello" {
   source        = "./modules/lambda"
   function_name = format("%s-hello-lambdav2", local.product)
   runtime       = "nodejs18.x"
   handler       = "index.handler"
   filename      = "${path.module}/hello.zip"
-  #tags          = var.tags
+  #tags          = local.tags
 }
 
 module "hello_methods" {
@@ -261,9 +265,7 @@ module "hello_methods" {
   cors_allow_headers = "'Authorization,Content-Type'"
 }
 
-##############################
 # Recurso: /items/{id}
-##############################
 module "item_resource" {
   source      = "./modules/resource"
   rest_api_id = module.api.id
@@ -328,11 +330,8 @@ EOF
   cors_allow_headers = "'Authorization,Content-Type'"
 }
 
-##############################
 # Locals para cálculo do hash de deployment
-##############################
 locals {
-  # Primeiro, criamos as strings de configuração para cada método
   hello_method_strings = [
     for method_name, config in module.hello_methods.method_configs : format(
       "%s:%s:%s:%s:%s",
@@ -355,7 +354,6 @@ locals {
     )
   ]
   
-  # Concatenamos e ordenamos as strings
   all_method_configs = sort(concat(
     local.hello_method_strings,
     local.item_method_strings
@@ -376,18 +374,14 @@ locals {
   methods_hash = sha256(jsonencode(local.all_configs))
 }
 
-##############################
 # CloudWatch Log Group para logs de acesso da API Gateway
-##############################
 resource "aws_cloudwatch_log_group" "api_gateway_logs" {
   name              = "/aws/apigateway/${module.api.id}"
   retention_in_days = 30
-  tags              = var.tags
+  tags              = local.tags
 }
 
-##############################
 # Deployment por Ambiente
-##############################
 module "deployment" {
   source                 = "./modules/deployment"
   for_each               = local.environments
@@ -396,7 +390,10 @@ module "deployment" {
   triggers_sha           = local.methods_hash
   deployment_description = "Deployment para ${each.key}"
   stage_variables        = { environment = each.key, version = "v2" }
-  tags                   = var.tags
+  tags                   = local.tags
   log_group_arn          = aws_cloudwatch_log_group.api_gateway_logs.arn
+  logging_level          = var.logging_level != null ? var.logging_level : "INFO"
+  create_log_role        = var.create_log_role != null ? var.create_log_role : true
+  environments           = local.environments
   depends_on             = [module.hello_methods, module.item_methods]
 }

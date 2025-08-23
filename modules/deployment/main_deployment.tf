@@ -18,17 +18,29 @@ resource "aws_api_gateway_deployment" "this" {
 }
 
 ##############################
+# Criar um snapshot de documentação versionado para cada ambiente
+##############################
+resource "aws_api_gateway_documentation_version" "this" {
+  for_each    = var.stage_name != null ? { for env in var.environments : env => env } : {}
+  version     = "v${each.key}-1.0.0"
+  rest_api_id = var.rest_api_id
+  description = "Versão de documentação para o ambiente ${each.key}"
+  depends_on  = [aws_api_gateway_deployment.this]
+}
+
+##############################
 # API Gateway Stage
 ##############################
 resource "aws_api_gateway_stage" "this" {
   deployment_id        = aws_api_gateway_deployment.this.id
   rest_api_id          = var.rest_api_id
   stage_name           = var.stage_name
-  description          = "Stage ${var.stage_name} managed by Terraform"
+  description          = "Stage ${var.stage_name} gerenciada por Terraform"
   cache_cluster_enabled = false
   variables            = var.stage_variables
   tags                 = var.tags
   xray_tracing_enabled = true
+  documentation_version = aws_api_gateway_documentation_version.this[var.stage_name].version
 
   access_log_settings {
     destination_arn = var.log_group_arn != null ? var.log_group_arn : (
@@ -40,11 +52,16 @@ resource "aws_api_gateway_stage" "this" {
       caller                   = "$context.identity.caller"
       user                     = "$context.identity.user"
       requestTime              = "$context.requestTime"
+      requestTimeEpoch         = "$context.requestTimeEpoch"
       httpMethod               = "$context.httpMethod"
       resourcePath             = "$context.resourcePath"
       status                   = "$context.status"
       protocol                 = "$context.protocol"
       responseLength           = "$context.responseLength"
+      authorizerPrincipalId    = "$context.authorizer.principalId"
+      authorizerIntegrationLatency = "$context.authorizer.integrationLatency"
+      errorMessage             = "$context.error.message"
+      errorType                = "$context.error.responseType"
     })
   }
 
