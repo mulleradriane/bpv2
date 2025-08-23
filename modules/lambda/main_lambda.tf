@@ -18,6 +18,11 @@ resource "aws_iam_role_policy_attachment" "basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy_attachment" "xray_write" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
+
 resource "aws_lambda_function" "this" {
   function_name = var.function_name
   runtime       = var.runtime
@@ -25,4 +30,7 @@ resource "aws_lambda_function" "this" {
   role          = aws_iam_role.lambda_exec.arn
   filename      = var.filename
   source_code_hash = filebase64sha256(var.filename)
+  tracing_config {
+    mode = "Active"
+  }
 }

@@ -37,6 +37,12 @@ variable "deployment_description" {
   default     = null
 }
 
+variable "environments" {
+  description = "Lista de ambientes para implantação (ex.: dev, hml, prd)"
+  type        = set(string)
+  default     = ["dev", "hml", "prd"]
+}
+
 ##############################
 # Throttling Settings
 ##############################
@@ -115,6 +121,12 @@ variable "logging_level" {
   }
 }
 
+variable "create_log_role" {
+  description = "Se deve criar uma role IAM para logging do API Gateway no CloudWatch."
+  type        = bool
+  default     = true
+}
+
 variable "data_trace_enabled" {
   type        = bool
   default     = false
@@ -131,12 +143,6 @@ variable "log_retention_in_days" {
   type        = number
   default     = 7
   description = "Retenção dos logs em dias"
-}
-
-variable "create_log_role" {
-  type        = bool
-  default     = true
-  description = "Cria role IAM para logs do API Gateway"
 }
 
 variable "log_group_arn" {

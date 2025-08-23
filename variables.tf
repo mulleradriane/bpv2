@@ -113,3 +113,61 @@ variable "base_path" {
   type        = string
   default     = ""
 }
+
+# variables.tf
+variable "endpoint_type" {
+  description = "Tipo de endpoint do API Gateway (REGIONAL, EDGE ou PRIVATE)"
+  type        = string
+  default     = "REGIONAL"
+  validation {
+    condition     = contains(["REGIONAL", "EDGE", "PRIVATE"], var.endpoint_type)
+    error_message = "O tipo de endpoint deve ser um de: REGIONAL, EDGE, PRIVATE"
+  }
+}
+
+variable "vpc_endpoint_ids" {
+  description = "Lista de IDs de endpoints VPC para APIs privadas"
+  type        = list(string)
+  default     = []
+}
+
+variable "binary_media_types" {
+  description = "Lista de tipos de mídia binária suportados pela API"
+  type        = list(string)
+  default     = ["*/*"]
+}
+
+variable "minimum_compression_size" {
+  description = "Tamanho mínimo de resposta para compressão (em bytes)"
+  type        = number
+  default     = null
+}
+
+variable "api_parameters" {
+  description = "Parâmetros adicionais da API"
+  type        = map(string)
+  default     = {}
+}
+
+variable "openapi_body" {
+  description = "Especificação OpenAPI para a API"
+  type        = string
+  default     = null
+}
+
+# variables.tf
+variable "logging_level" {
+  description = "Nível de logging (OFF, ERROR, INFO)"
+  type        = string
+  default     = "INFO"
+  validation {
+    condition     = var.logging_level == null || (var.logging_level != null && can(regex("^(OFF|ERROR|INFO)$", var.logging_level)))
+    error_message = "O valor de logging_level deve ser null ou um dos seguintes: OFF, ERROR, INFO."
+  }
+}
+
+variable "create_log_role" {
+  description = "Se deve criar uma role IAM para logging do API Gateway no CloudWatch."
+  type        = bool
+  default     = true
+}
