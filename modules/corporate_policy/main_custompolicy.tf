@@ -1,4 +1,3 @@
-# modules/corporate_policy/main_custompolicy.tf
 data "aws_caller_identity" "current" {}
 
 locals {
@@ -15,7 +14,7 @@ locals {
     }
   }
 
-  # Statements customizados (se fornecidos)
+  # Statements customizados (se existir..)
   custom_statements = var.custom_policy != null ? (
     can(var.custom_policy.Statement) ? var.custom_policy.Statement : []
   ) : []

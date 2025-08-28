@@ -4,7 +4,7 @@ resource "aws_s3_bucket" "truststore" {
   bucket = var.truststore_bucket_name
 }
 
-# Configurações do bucket separadas (sintaxe moderna)
+# Configurações do bucket separadas
 resource "aws_s3_bucket_ownership_controls" "truststore" {
   count = var.create_truststore_bucket ? 1 : 0
 
@@ -37,7 +37,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "truststore" {
   }
 }
 
-# Upload do arquivo truststore (sintaxe moderna)
+# Upload do arquivo truststore
 resource "aws_s3_object" "truststore" {
   count = var.truststore_file_path != null ? 1 : 0
 
@@ -51,7 +51,7 @@ resource "aws_s3_object" "truststore" {
   })
 }
 
-# Domain Name com mTLS habilitado (já está atualizado)
+# Domain Name com mTLS habilitado
 resource "aws_api_gateway_domain_name" "mtls" {
   for_each = { for domain in var.domains : domain.name => domain }
 
@@ -82,7 +82,7 @@ resource "aws_api_gateway_domain_name" "mtls" {
   }
 }
 
-# Policy IAM para clientes mTLS (já está atualizado)
+# Policy IAM para clientes mTLS
 data "aws_iam_policy_document" "mtls_client" {
   count = var.create_client_policy ? 1 : 0
 

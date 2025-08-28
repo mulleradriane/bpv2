@@ -6,7 +6,7 @@ module "base_path_mapping" {
       key         = "real-mapping"
       api_id      = "sua-api-id-real"
       stage_name  = "prod"
-      domain_name = "seu-dominio-real.com"  # ✅ Domain real
+      domain_name = "seu-dominio-real.com" 
       base_path   = "api"
     }
   ]

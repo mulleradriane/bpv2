@@ -11,7 +11,7 @@ resource "aws_api_gateway_deployment" "this" {
   rest_api_id = var.api_id
   description = "Deployment for ${var.stage_name} created at ${timestamp()}"
 
-  # Triggers mais robustos
+  # Triggers
   triggers = {
     redeploy_hash = sha1(jsonencode({
       resources = var.redeploy_triggers.resources
