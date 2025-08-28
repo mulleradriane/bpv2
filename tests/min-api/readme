@@ -1,0 +1,32 @@
+# Exemplo de uso real com múltiplos mappings
+module "production_mappings" {
+  source = "../../modules/base_path_mapping"
+
+  mappings = [
+    # Mapeamentos root (6 domínios sem root mapping)
+    {
+      key         = "app1-root"
+      api_id      = "abc123"
+      stage_name  = "prod"
+      domain_name = "api.app1.com"
+      base_path   = null
+    },
+    
+    # Mapeamentos com base paths (181 mappings)
+    {
+      key         = "app2-v1"
+      api_id      = "def456" 
+      stage_name  = "prod"
+      domain_name = "api.app2.com"
+      base_path   = "v1"
+    },
+    {
+      key         = "app3-v2"
+      api_id      = "ghi789",
+      stage_name  = "prod",
+      domain_name = "api.app3.com",
+      base_path   = "v2"
+    }
+    # ... até 187 mapeamentos
+  ]
+}
